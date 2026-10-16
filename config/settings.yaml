@@ -1,0 +1,42 @@
+# A股一进二弱转强回测 - 最小可用版（MVP）配置
+
+data:
+  # 日线下载起点：比回测起点早约 9 个月，用于判断上市天数、首板回看、情绪指标预热
+  download_start: 20240101
+  # 下载终点：null 表示今天
+  download_end: null
+  markets: [USHA, USZA, USTM]       # 沪A(含科创)、深A(含创业)、北交所
+  index_codes:
+    sh: USHI1A0001                   # 上证指数（同时作为交易日历）
+    sz: USZI399001                   # 深证成指
+    gem: USZI399006                  # 创业板指
+
+backtest:
+  # 回测区间按 T 日（竞价买入日）计
+  start: 20241012
+  end: null                          # null = 数据最后一个交易日的前一日（保证有 T+1）
+  in_sample_end: 20251231            # 样本内截止；之后为样本外
+
+universe:
+  exclude_st: true                   # 剔除当前名称含 ST 的股票（历史 ST 日由涨停价规则天然排除）
+  min_list_days: 60                  # T-1 时上市满 N 个交易日
+  first_board_lookback: 1            # 首板：前 N 个交易日无涨停（1 = 仅要求 T-2 未涨停）
+  float_mv_min: null                 # 流通市值下限（亿元），null 不过滤
+  float_mv_max: null                 # 流通市值上限（亿元）
+  min_pool: 8                        # 当日首板候选少于 N 只则当日不交易
+
+strategy:
+  strength_mode: time                # time = 按 T-1 首次涨停时间（越早越强）；lex / weighted = 日线代理版
+  p_str_min: 0.5                     # 弱板：强度分位 >= 该值（0 最强 1 最弱）
+  p_auc_max: 0.2                     # 口径A：竞价分位 <= 该值（0 为竞价涨幅最高）
+  strong_group_max: 0.3              # 口径B：强板组 = 强度分位 <= 该值
+  delta_min: 0.4                     # 口径C：Δ = P_str - P_auc >= 该值
+  auc_norm_lo: 0.2                   # 标准化竞价涨幅下限（竞价涨幅 / 涨跌幅限制）
+  auc_norm_hi: 0.7                   # 标准化竞价涨幅上限
+  top_n: 2                           # 每日最多买入只数（按 Δ 降序）
+
+costs:
+  commission: 0.00025                # 佣金，双边
+  stamp_duty: 0.0005                 # 印花税，卖出
+  transfer_fee: 0.00001              # 过户费，双边
+  slippage: 0.003                    # 滑点，买卖各一次

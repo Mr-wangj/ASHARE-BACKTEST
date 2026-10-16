@@ -1,0 +1,63 @@
+# 盘中监控预警规则（scripts/live_monitor.py）。修改后保存：运行中的监控每分钟重新读取一次。
+# 涨幅类阈值多数按“标准化”写：涨幅 ÷ 涨跌幅限制（主板 10%、创业/科创 20%、北交所 30%），
+# 例如 0.3 = 主板 3%、创业板 6%。级别：高 / 中 / 低；notify_levels 里的级别会弹 macOS 通知。
+
+poll_seconds: 5            # 连续竞价期间的轮询间隔（全市场快照约 1 秒）
+events_poll_seconds: 60    # 同花顺盘口异动的轮询间隔
+notify_levels: [高]        # 弹出 macOS 通知的级别
+notify_sound: true         # 高级别通知带提示音
+notify_min_gap: 20         # 两次通知的最短间隔（秒）；间隔内的高级预警合并成一条
+cooldown_minutes: 10       # 同一只股票 / 同一板块的同类预警最短间隔
+
+auction:                   # 9:25 集合竞价结束后（竞价成交额 = 9:25 的成交额）
+  grab:                    # 竞价抢筹：竞价成交额相对昨日全天放大、价格上涨
+    min_amount: 10000000      # 竞价成交额 ≥ 1000 万
+    min_ratio: 0.05        # 竞价成交额 ÷ 昨日全天成交额 ≥ 5%
+    min_pct_norm: 0.2      # 竞价涨幅 ≥ 0.2 个涨停（主板 2%）
+    high_ratio: 0.12       # 竞价成交额 ÷ 昨日 ≥ 12% 且 ≥ high_amount：高级
+    high_amount: 50000000
+    max_alerts: 15         # 最多推送前 N 只（按 竞价成交额 ÷ 昨日 排序），其余在页面「竞价」里看
+  limit_up_level: 中       # 竞价涨停（一字候选）；昨日涨停的连板一字为高级
+  yzt_nuke_norm: -0.3      # 昨日涨停股竞价 ≤ -0.3 个涨停（主板 -3%）：核按钮（≤ -0.6 为高级）
+  yzt_beyond_norm: 0.5     # 昨日涨停股竞价 ≥ 0.5 个涨停（主板 5%，未涨停）：超预期
+  sector_min_members: 3    # 竞价强势板块：竞价涨幅 ≥ 0.3 个涨停的成分股 ≥ 3 只
+  sector_alerts: 5         # 推送竞价最强的前 N 个板块（先按竞价涨停只数，再按高开只数）
+
+stock:
+  surge_window: 3          # 快速拉升的观察窗口（分钟）
+  surge_norm: 0.3          # 窗口内涨 ≥ 0.3 个涨停（主板 3%）
+  surge_min_amount: 30000000  # 且当日成交额 ≥ 3000 万（过滤冷门小票）
+  surge_level: 低          # 连板股 / 热门板块成分股自动升一级
+  limit_up_level: 低       # 首板封涨停；连板（2 板）中、3 板及以上高
+  break_level: 中          # 连板股炸板；首板炸板为低
+  big_loss_level: 中       # 昨日涨停股今日跌停（大面）
+
+sector:                    # 板块 = 同花顺概念 / 行业（成分股 8~400 只，剔除融资融券、沪深股通等非题材板块）
+  # 两种触发，向上 =「板块异动」、向下 =「板块跳水」（规则对称，down: false 可关闭跳水）
+  # 集体：window 分钟内 ≥ min_members 只成分股拉升 ≥ member_norm（或新封板），且全部成分股平均涨 ≥ min_avg_rise
+  window: 3
+  min_members: 3
+  member_norm: 0.2         # 主板 2%
+  min_avg_rise: 0.004      # 0.4%
+  # 整体：index_window 分钟成分股平均涨 ≥ index_rise，且涨超 0.1 个涨停（主板 1%）的成分股占比 ≥ index_breadth
+  index_window: 5
+  index_rise: 0.008
+  index_breadth: 0.2
+  index_min_size: 10       # 成分 ≥ 10 只的板块才用“整体”规则
+  open_strict_until: "09:40"   # 开盘到 9:40 波动大：集体规则要求 ≥ high_members 只、整体规则阈值翻倍，且最高只到中级
+  down: true
+  down_factor: 1.5         # 跳水：阈值为拉升的 1.5 倍、只数多 1 只；≥ high_members 只或板块内跌停 ≥ 2 只为中级，否则低级
+  high_members: 5          # 集体异动的成分股 ≥ 5 只：高级
+  theme_cooldown: 10       # 同一题材（如锂电下的固态电池、钠离子电池）10 分钟内的第二条板块预警降为低级
+  cooldown_minutes: 15     # 同一板块两次预警的最短间隔
+  overlap: 0.6             # 同一轮里成分股重合 ≥ 60% 的板块合并成一条预警
+  leader_top: 10           # 当前最强的前 N 个板块，其空间龙头封板 / 炸板为高级
+  exclude_keywords: [融资融券, 转融, 股通, MSCI, 标普, 富时, 罗素, 同花顺, 昨日, 近期, 最近, 百日, 情绪, 预增, 预盈, 预减,
+                     扭亏, 举牌, 破净, 高股息, 次新, 新股, 注册制, ST, 送转, 分拆, 央视50, 证金, 汇金, 社保, 养老金, QFII,
+                     基金重仓, 机构重仓, 参股, 茅指数, 宁组合, 核心资产, 中特估, 大盘, 中盘, 小盘, 微盘, 指数, 上证, 深证]
+  min_size: 8
+  max_size: 400
+
+sentiment:                 # 昨日涨停股今日表现（盘中实时，等权平均）
+  yzt_drop: -0.02          # 跌破 -2%：亏钱效应扩散（中）
+  yzt_rise: 0.04           # 超过 +4%：赚钱效应（中）

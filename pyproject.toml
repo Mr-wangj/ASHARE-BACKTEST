@@ -1,0 +1,33 @@
+[project]
+name = "ashare-backtest"
+version = "0.1.0"
+description = "A股短线涨停接力策略回测（一进二弱转强等）"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    "pyyaml",
+    "scipy",
+    "streamlit>=1.65.0",
+    "thsdk",
+    "tqdm",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ashare_bt"]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple/"
+default = true

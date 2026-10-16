@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  盘中实时监控（scripts/live_monitor.py）：工作日 9:05 启动，等竞价、盘中每 5 秒轮询，收盘后自动退出；非交易日自动退出。
+  加载时（登录 / 开机）也会运行一次：交易时段内重启电脑后会自动接着监控，盘后则立刻退出。异常退出 60 秒后自动重启。
+
+  安装 / 更新：
+    cp scripts/launchd/com.ashare.live-monitor.plist ~/Library/LaunchAgents/
+    launchctl bootout gui/$(id -u)/com.ashare.live-monitor 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ashare.live-monitor.plist
+  立即手动启动：launchctl kickstart gui/$(id -u)/com.ashare.live-monitor
+  停用：        launchctl bootout gui/$(id -u)/com.ashare.live-monitor && rm ~/Library/LaunchAgents/com.ashare.live-monitor.plist
+  日志：data/logs/live_monitor_YYYYMMDD.log；看板「盘中监控」页
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ashare.live-monitor</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/wangjie/ashare-backtest/.venv/bin/python</string>
+        <string>scripts/live_monitor.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/wangjie/ashare-backtest</string>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>5</integer></dict>
+    </array>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LANG</key>
+        <string>zh_CN.UTF-8</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/wangjie/ashare-backtest/data/logs/launchd_live.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/wangjie/ashare-backtest/data/logs/launchd_live.log</string>
+</dict>
+</plist>

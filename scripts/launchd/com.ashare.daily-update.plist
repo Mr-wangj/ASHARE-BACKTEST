@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  每日自动更新（scripts/daily_update.py）：工作日 15:45 主跑，19:30 补跑（补较晚发布的涨停原因），
+  22:30、次日 8:50 只更新舆情（盘后与开盘前的新消息、明日题材预判）。
+  电脑睡眠错过的时间点，唤醒后会补跑一次；关机错过的，由下一个时间点补齐（脚本会自动追上漏掉的交易日）。
+
+  安装 / 更新：
+    cp scripts/launchd/com.ashare.daily-update.plist ~/Library/LaunchAgents/
+    launchctl bootout gui/$(id -u)/com.ashare.daily-update 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ashare.daily-update.plist
+  立即手动触发：launchctl kickstart gui/$(id -u)/com.ashare.daily-update
+  查看状态：    launchctl print gui/$(id -u)/com.ashare.daily-update
+  停用：        launchctl bootout gui/$(id -u)/com.ashare.daily-update && rm ~/Library/LaunchAgents/com.ashare.daily-update.plist
+  日志：data/logs/daily_update.log（摘要）、data/logs/daily_update_YYYYMMDD.log（详细）、data/logs/launchd.log（脚本崩溃时的报错）
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ashare.daily-update</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/wangjie/ashare-backtest/.venv/bin/python</string>
+        <string>scripts/daily_update.py</string>
+        <string>--notify</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/wangjie/ashare-backtest</string>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>22</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>50</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>50</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>50</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>50</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>50</integer></dict>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LANG</key>
+        <string>zh_CN.UTF-8</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/wangjie/ashare-backtest/data/logs/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/wangjie/ashare-backtest/data/logs/launchd.log</string>
+</dict>
+</plist>
