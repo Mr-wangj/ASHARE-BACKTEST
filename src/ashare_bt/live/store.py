@@ -5,6 +5,7 @@ data/live/{日期}/
   alerts.jsonl     预警流（每行一条，追加写入）
   auction.parquet  9:25 竞价表；strategy.parquet 一进二·弱转强实时信号
   sectors.parquet  板块强弱与龙头；limits.parquet 当日触及涨停的股票
+  jev.parquet      Jev 竞价买入评分（TypeSafe，9:25 后逐股评估）
 """
 from __future__ import annotations
 
@@ -83,6 +84,11 @@ class Store:
         if s is not None and len(s):
             _atomic(s[[c for c in STRATEGY_COLS if c in s.columns]], self.dir / "strategy.parquet")
         self.status({**status, "stats": engine.stats})
+
+    def write_table(self, name: str, df: pd.DataFrame) -> None:
+        """其他表（如 Jev 评分）落盘；与 write() 同样原子替换。"""
+        if df is not None and len(df):
+            _atomic(df, self.dir / f"{name}.parquet")
 
     def status(self, status: dict) -> None:
         tmp = self.dir / "status.tmp"

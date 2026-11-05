@@ -173,6 +173,18 @@ class Feed:
         return pd.DataFrame({"time": [ths_minute(v) for v in df["time"]], "price": df["price"].astype("float64"),
                              "volume": df["volume"].astype("float64"), "turnover": df["turnover"].astype("float64")})
 
+    def index_intraday(self, code: str, day: int) -> pd.DataFrame | None:
+        """指数分时（缓存 data/live/index/{code}_{day}.parquet；USHI1A0001 = 上证指数）。"""
+        d = LIVE_DIR / "index"
+        d.mkdir(parents=True, exist_ok=True)
+        p = d / f"{code}_{day}.parquet"
+        if p.exists():
+            return pd.read_parquet(p)
+        df = self.intraday_bars(code, day)
+        if df is not None and len(df):
+            df.to_parquet(p, index=False)
+        return df
+
     def index_list(self) -> pd.DataFrame:
         df = call(thsdk.list_market_securities, market="URFI", sort_begin=0, sort_count=5000)
         return df[["full_code", "name"]].reset_index(drop=True)

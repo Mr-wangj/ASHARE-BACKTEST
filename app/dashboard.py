@@ -6,6 +6,9 @@
 - 情绪监测（按时间维度：大盘成交 / 涨跌家数、涨跌停家数、炸板率、涨停 / 跌停高度、晋级、溢价、亏钱效应、情绪温度）：app/views/mood.py
 - 舆情监控（明日题材预判、涨停原因、盘后舆情、消息规则）：app/views/monitor.py
 - 盘中监控（实时预警：竞价抢筹、板块集体异动、龙头、涨停 / 炸板等）：app/views/live.py
+- 竞价弱转强（昨日涨停 × 今日竞价，含历史回看与多日验证）：app/views/auction_wts.py
+- 复盘与预期（今日盘面异动回顾 + 明日题材晋级与弱转强观察池）：app/views/review.py
+- 数据控制台（页面上启动数据更新 / 回测 / 回放等任务并实时看日志）：app/views/console.py
 - 策略回测：app/views/backtest.py
 - 使用说明（渲染 docs/使用说明.md）：app/views/guide.py
 """
@@ -27,9 +30,14 @@ nav = st.navigation([*detail_pages.values(),
                      st.Page("views/down_ladder.py", title="跌停天梯", icon=":material/trending_down:",
                              url_path="down-ladder"),
                      st.Page("views/mood.py", title="情绪监测", icon=":material/monitor_heart:", url_path="mood"),
-                     st.Page("views/monitor.py", title="舆情监控", icon=":material/campaign:", url_path="monitor"),
-                     st.Page("views/live.py", title="盘中监控", icon=":material/notifications_active:", url_path="live"),
-                     st.Page("views/backtest.py", title="策略回测", icon=":material/monitoring:"),
+                      st.Page("views/monitor.py", title="舆情监控", icon=":material/campaign:", url_path="monitor"),
+                      st.Page("views/aihot.py", title="AIHOT", icon=":material/news:", url_path="aihot"),
+                      st.Page("views/live.py", title="盘中监控", icon=":material/notifications_active:", url_path="live"),
+                      st.Page("views/auction_wts.py", title="竞价弱转强", icon=":material/south_east:", url_path="wts"),
+                      st.Page("views/auction_surprise.py", title="竞价超预期", icon=":material/north_east:", url_path="surprise"),
+                      st.Page("views/review.py", title="复盘与预期", icon=":material/update:", url_path="review"),
+                      st.Page("views/console.py", title="数据控制台", icon=":material/settings_suggest:", url_path="console"),
+                      st.Page("views/backtest.py", title="策略回测", icon=":material/monitoring:"),
                      st.Page("views/guide.py", title="使用说明", icon=":material/menu_book:", url_path="guide")],
                     position="sidebar")
 # 明细页按当前页面取板位（1 一进二、2 二进三、3 三进四）；每次运行都在页面脚本之前设置

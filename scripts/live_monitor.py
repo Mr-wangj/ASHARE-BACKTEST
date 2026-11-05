@@ -15,16 +15,18 @@ from __future__ import annotations
 import argparse
 import fcntl
 import logging
+import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 
-from ashare_bt.config import DATA_DIR, RAW_DIR, load_config
+from ashare_bt.config import DATA_DIR, PROJECT_ROOT, RAW_DIR, load_config
 from ashare_bt.data import ths_client
 from ashare_bt.features.limit import limit_prices
+from ashare_bt.live import jev as jev_mod
 from ashare_bt.live.auction import auction_snapshot
 from ashare_bt.live.context import build_context, trading_days
 from ashare_bt.live.engine import Alert, Engine
@@ -139,6 +141,16 @@ def live(args) -> int:
             except Exception as exc:  # noqa: BLE001
                 log.warning("竞价封单 %s 失败：%s", c, exc)
         alerts = engine.auction(datetime.now().replace(microsecond=0), snap, seal)
+        t_auc = datetime.now().replace(microsecond=0)
+        jcfg = rules.get("jev") or {}
+        jev_tbl, jev_alerts = jev_mod.judge(engine, seal, rules, t_auc,
+                                            deadline=t_auc + timedelta(seconds=float(jcfg.get("deadline_seconds", 150))))
+        if jev_tbl is not None:
+            store.write_table("jev", jev_tbl)
+            alerts += jev_alerts
+            status["jev"] = (f"Jev 评分 {len(jev_tbl)} 只（失败 {engine.stats.get('jev_fail', 0)}）、建议买入 "
+                             f"{engine.stats.get('jev_buy', 0)} 只" + ("；信号记录模式（live_rules.yaml jev.record_only）"
+                                                                     if jcfg.get("record_only") else ""))
         status["auction_cover"] = (f"竞价数据 {int(snap['price'].notna().sum())}/{len(codes)} 只"
                                    f"（成交额 {int(snap['amount'].notna().sum())} 只）")
         store.add(alerts)
@@ -215,6 +227,11 @@ def live(args) -> int:
     notifier.flush(force=True)
     store.write(engine, {**status, "phase": "收盘"})
     log.info("收盘：共 %d 条预警", len(engine.alerts))
+    if engine.auction_tbl is None or not len(engine.auction_tbl):
+        log.info("当日竞价数据缺失（如 9:25 认证失效）：分时回放自愈，约 10 分钟（保留实时预警）")
+        subprocess.Popen([sys.executable, __file__, "--replay", str(today), "--keep-alerts"],
+                         cwd=str(PROJECT_ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL, start_new_session=True)
     return 0
 
 
@@ -254,7 +271,7 @@ def replay(day: int, args) -> int:
         return 1
     ensure_concepts(feed)
     ctx = build_context(rules, asof=cal[cal.index(day) - 1])
-    engine, store, themer = Engine(ctx, rules, cfg), Store(day, fresh=True), Themer(load_theme_map())
+    engine, store, themer = Engine(ctx, rules, cfg), Store(day, fresh=not args.keep_alerts), Themer(load_theme_map())
     codes = ctx.codes
     bars = load_bars(day, codes, feed).dropna(subset=["time"])
     P = bars.pivot_table(index="time", columns="code", values="price", aggfunc="last").reindex(columns=codes).ffill()
@@ -287,6 +304,10 @@ def replay(day: int, args) -> int:
             except Exception as exc:  # noqa: BLE001
                 log.warning("竞价封单 %s 失败：%s", c, exc)
     alerts = engine.auction(t_auc, snap0, seal)
+    jev_tbl, jev_alerts = jev_mod.judge(engine, seal, rules, t_auc)
+    if jev_tbl is not None:
+        store.write_table("jev", jev_tbl)
+        alerts += jev_alerts
     store.add(alerts)
     hi, lo = P.iloc[0].to_numpy(float).copy(), P.iloc[0].to_numpy(float).copy()
     for k in range(1, len(times)):
@@ -328,6 +349,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--replay", type=int, help="用某日分时回放（YYYYMMDD）")
     ap.add_argument("--no-seal", action="store_true", help="回放时不取竞价封单")
+    ap.add_argument("--keep-alerts", action="store_true",
+                    help="回放时保留该日已有的实时预警（追加，不清空）：竞价失败后补竞价表用")
     ap.add_argument("--once", action="store_true", help="取一次实时快照自检")
     ap.add_argument("--build-concepts", action="store_true", help="刷新同花顺板块成分")
     args = ap.parse_args()

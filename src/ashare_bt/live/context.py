@@ -75,14 +75,18 @@ def stock_table(day: int, cal: list[int]) -> pd.DataFrame:
     out["y_down_streak"] = last["down_streak"].reindex(out.index).fillna(0).astype("int64")
     out["max_h"] = g["streak"].max().reindex(out.index).fillna(0).astype("int64")
 
-    # 题材：近 60 个交易日最近一次问财涨停原因
-    lu = pd.read_parquet(RAW_DIR / "limitup_detail.parquet", columns=["code", "t1_date", "reason"])
-    lu = lu[lu["t1_date"].between(cal[max(0, i - THEME_DAYS + 1)], day) & lu["reason"].notna()]
-    lu = lu.sort_values("t1_date").drop_duplicates("code", keep="last")
+    # 题材：近 60 个交易日最近一次问财涨停原因；昨日涨停行顺带取首次涨停时间与昨日竞价额（弱转强·抢筹页用）
+    lu = pd.read_parquet(RAW_DIR / "limitup_detail.parquet",
+                         columns=["code", "t1_date", "reason", "first_time", "auc_amt_t1"])
+    lu_all = lu[lu["t1_date"].between(cal[max(0, i - THEME_DAYS + 1)], day) & lu["reason"].notna()]
+    lu_all = lu_all.sort_values("t1_date").drop_duplicates("code", keep="last")
     code6 = pd.Series(out.index.str[4:], index=out.index)
-    rs = lu.set_index("code")
+    rs = lu_all.set_index("code")
     out["reason"] = code6.map(rs["reason"]).astype("string")
     out["reason_day"] = code6.map(rs["t1_date"])
+    yest = lu[lu["t1_date"] == day].set_index("code")
+    out["y_first_time"] = code6.map(yest["first_time"]).astype("string")
+    out["y_auc_amt"] = code6.map(yest["auc_amt_t1"]).astype("float64")
     tm = load_theme_map()
     themes = {r: main_category(categories(split_tags(r), tm), tm) for r in pd.unique(out["reason"].dropna())}
     out["theme"] = out["reason"].map(themes).astype("object")

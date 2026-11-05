@@ -103,6 +103,12 @@ tm = load_theme_map()
 day["tags"] = [split_tags(r) for r in day["last_reason"]]
 day["cats"] = [categories(t, tm) for t in day["tags"]]
 day["main"] = [main_category(c, tm) for c in day["cats"]]
+try:                                        # 一 / 二级行业（悬停显示）：缓存 data/raw/industry_map.parquet
+    from ashare_bt.data.industry import ensure
+    ind = ensure(day["code"].tolist()).set_index("full_code").reindex(day["code"])
+    day["ind1"], day["ind2"] = ind["ind1"].to_numpy(), ind["ind2"].to_numpy()
+except Exception:                           # noqa: BLE001
+    day["ind1"] = day["ind2"] = ""
 dn = day[day["is_down"]]
 counts = Counter(m for m in dn["main"] if isinstance(m, str))  # 没有近期涨停的为 NaN（pandas 3 里为真值），不计
 colors = assign_colors(counts, tm, min_count=1)
@@ -191,6 +197,9 @@ def fail_key(r):
 
 def tooltip(r) -> str:
     lines = [f"{r.name} {r.code[4:]}（{BOARD_NAMES.get(r.board, r.board)}）"]
+    ind = f"{r.ind1} / {r.ind2}" if getattr(r, "ind1", None) and getattr(r, "ind2", None) else ""
+    if ind:
+        lines.append(f"行业：{ind}")
     if r.is_down:
         s = f"{label(r.down_streak)} · {BT_DOWN_NAMES.get(r.bt, '')}"
         s += " · 天地板（盘中触及涨停）" if r.tiandi else ""

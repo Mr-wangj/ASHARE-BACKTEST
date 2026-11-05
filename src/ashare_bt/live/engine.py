@@ -84,6 +84,8 @@ class Engine:
         self.board = np.where(self.y_up, self.y_streak + 1, 1)          # 今日若涨停是第几板
         self.theme = st["theme"].to_numpy(object)
         self.max_h = st["max_h"].to_numpy(int)
+        self.y_first_time = st["y_first_time"].to_numpy(object) if "y_first_time" in st else np.full(self.n, None)
+        self.y_auc_amt = st["y_auc_amt"].to_numpy(float) if "y_auc_amt" in st else np.full(self.n, np.nan)
         self.concepts = ctx.concepts
         self.stock_concepts: dict[int, list[int]] = {}   # 行号 → 所属板块（concepts 的行号）
         for ci, p in enumerate(self.concepts["pos"] if len(self.concepts) else []):
@@ -220,11 +222,16 @@ class Engine:
                                  sector=name, key=f"竞价板块:{name}"))
 
         keep = valid & (amt > 0)
+        yauc = np.where(np.isfinite(self.y_auc_amt) & (self.y_auc_amt > 0), self.y_auc_amt, np.nan)
+        auc_vs_yauc = amt / yauc
+        weak = self.y_up & np.array([isinstance(t, str) and t >= "13:00:00" for t in self.y_first_time])
+        wts = weak & valid & (pn >= 0.2) & (ratio >= 0.05)     # 弱转强·抢筹：昨日尾盘弱板 + 今日竞价高开放量
         self.auction_tbl = pd.DataFrame({
             "code": self.codes[keep], "name": self.names[keep], "pct": pct[keep], "amount": amt[keep],
             "ratio": ratio[keep], "at_limit": at_up[keep], "seal_amt": seal_amt[keep], "y_up": self.y_up[keep],
             "y_streak": self.y_streak[keep], "theme": self.theme[keep], "grab": grab[keep], "nuke": nuke[keep],
-            "beyond": beyond[keep],
+            "beyond": beyond[keep], "y_first_time": self.y_first_time[keep], "y_auc_amt": self.y_auc_amt[keep],
+            "auc_vs_yauc": auc_vs_yauc[keep], "wts": wts[keep],
         })
         yz = valid & self.y_up
         self.stats.update({

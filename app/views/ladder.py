@@ -61,6 +61,12 @@ src = day["reason"].fillna(day["prv_reason"])  # 炸板、断板、停牌股当�
 day["tags"] = [split_tags(r) for r in src]
 day["cats"] = [categories(t, tm) for t in day["tags"]]
 day["main"] = [main_category(c, tm) for c in day["cats"]]
+try:                                        # 一 / 二级行业（悬停显示）：缓存 data/raw/industry_map.parquet
+    from ashare_bt.data.industry import ensure
+    ind = ensure(day["code"].tolist()).set_index("full_code").reindex(day["code"])
+    day["ind1"], day["ind2"] = ind["ind1"].to_numpy(), ind["ind2"].to_numpy()
+except Exception:                           # noqa: BLE001  拉取失败时悬停不显示行业
+    day["ind1"] = day["ind2"] = ""
 up = day[day["is_up"]]
 counts = Counter(m for m in up["main"] if isinstance(m, str))  # 没有涨停原因的为 NaN（pandas 3 里为真值），不计
 colors = assign_colors(counts, tm)
@@ -127,6 +133,9 @@ def fail_key(r):
 
 def tooltip(r) -> str:
     lines = [f"{r.name} {r.code[4:]}（{BOARD_NAMES.get(r.board, r.board)}）"]
+    ind = f"{r.ind1} / {r.ind2}" if getattr(r, "ind1", None) and getattr(r, "ind2", None) else ""
+    if ind:
+        lines.append(f"行业：{ind}")
     if r.is_up:
         lines.append(f"{'首板' if r.streak == 1 else f'{r.streak} 连板'} · {BT_NAMES.get(r.bt, '')} · "
                      f"首次涨停 {r.first_time if not isnan(r.first_time) else '-'}")

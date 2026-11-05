@@ -23,6 +23,27 @@ auction:                   # 9:25 集合竞价结束后（竞价成交额 = 9:25
   sector_min_members: 3    # 竞价强势板块：竞价涨幅 ≥ 0.3 个涨停的成分股 ≥ 3 只
   sector_alerts: 5         # 推送竞价最强的前 N 个板块（先按竞价涨停只数，再按高开只数）
 
+jev:                       # 竞价买入打分（TypeSafe Jev，System One 模型）。API key 在环境变量 TYPESAFE_API_KEY
+                           #（https://console.typesafe.ai/keys 申请；未设置则跳过，竞价主流程不受影响）
+  enabled: true
+  model: jev-latest
+  max_candidates: 30       # 最多评估多少只（竞价抢筹 / 竞价涨停 / 昨日涨停 / 一进二候选，按竞价额 ÷ 昨日排序）
+  concurrency: 6           # 逐股并发调用量
+  timeout_seconds: 20      # 单次调用超时
+  deadline_seconds: 150    # 9:25 后整体时限（超时未完成的股票放弃，保证 9:30 前出结果）
+  min_confidence: 0.3      # confidence 低于此值的因子按中性 0.5 处理
+  weights:                 # 合成分数的权重：正向因子归一后加权，再减 trap × trap 权重（昨日涨停股才计 board）
+    grab: 0.3
+    board: 0.25
+    theme: 0.15
+    action: 0.3
+    trap: 0.25
+  buy_threshold: 0.55      # 合成分 ≥ 此值（且 action ∈ require_choice、trap ≤ trap_max）→ 建议买入
+  trap_max: 0.4
+  require_choice: [strong_buy]
+  record_only: true        # 信号记录模式：预警为低级（不弹通知），积累样本验证命中率后再改 false
+  max_alerts: 5            # 最多推送前 N 只（按分数排序）
+
 stock:
   surge_window: 3          # 快速拉升的观察窗口（分钟）
   surge_norm: 0.3          # 窗口内涨 ≥ 0.3 个涨停（主板 3%）

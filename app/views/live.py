@@ -18,7 +18,8 @@ from ashare_bt.live.feed import LIVE_DIR
 from ashare_bt.live.store import RULES_PATH, read_alerts
 
 LEVEL_ORDER = {"高": 0, "中": 1, "低": 2}
-VIEWS = {"alerts": "预警流", "sectors": "板块", "auction": "竞价", "strategy": "一进二信号", "limits": "涨停监控"}
+VIEWS = {"alerts": "预警流", "sectors": "板块", "auction": "竞价", "jev": "Jev 评分",
+         "strategy": "一进二信号", "limits": "涨停监控"}
 CSS = """<style>
 [data-testid='stMainBlockContainer'] { padding-left: 1.75rem; padding-right: 1.75rem; }
 .lv .a { display: flex; gap: 10px; align-items: baseline; padding: 6px 2px; border-bottom: 1px solid rgba(128,128,128,.16); }
@@ -71,8 +72,9 @@ running = status.get("mode") == "live" and day == today and status.get("phase") 
 if view == "alerts":
     f1, f2, f3 = st.columns([2, 4, 2], vertical_alignment="bottom")
     levels = f1.multiselect("级别", ["高", "中", "低"], default=["高", "中"], key="live_levels")
-    kinds = f2.multiselect("类型", ["竞价抢筹", "竞价涨停", "核按钮", "竞价超预期", "竞价强势板块", "一进二信号", "板块异动",
-                                    "板块跳水", "同花顺异动", "封涨停", "回封", "炸板", "快速拉升", "大面", "情绪"],
+    kinds = f2.multiselect("类型", ["竞价抢筹", "竞价涨停", "核按钮", "竞价超预期", "竞价强势板块", "竞价买入(Jev)",
+                                    "一进二信号", "板块异动", "板块跳水", "同花顺异动", "封涨停", "回封", "炸板",
+                                    "快速拉升", "大面", "情绪"],
                            key="live_kinds", placeholder="全部类型")
     kw = f3.text_input("搜索", key="live_kw", placeholder="股票 / 板块…")
 
@@ -168,6 +170,25 @@ def body() -> None:
         st.dataframe(pd.DataFrame({"名称": lim["name"], "题材": lim["theme"].fillna(""), "昨日板数": lim["y_streak"].where(lim["y_up"], 0),
                                    "竞价额(万)": (lim["amount"] / 1e4).round(0), "封单(万)": (lim["seal_amt"] / 1e4).round(0)})
                      .sort_values("封单(万)", ascending=False), hide_index=True, width="stretch")
+    elif view == "jev":
+        t = read_tbl(day, "jev")
+        if t.empty:
+            st.info("9:25 竞价结束后由 Jev（TypeSafe System One）逐股评估候选。需要环境变量 TYPESAFE_API_KEY"
+                    "（https://console.typesafe.ai/keys），未设置时自动跳过；阈值与权重在 config/live_rules.yaml 的 jev 段。")
+            return
+        st.caption(f"候选 {len(t)} 只（竞价抢筹 / 竞价涨停 / 昨日涨停 / 一进二候选），建议买入 {int(t['buy'].sum())} 只。"
+                   "分数 = 抢筹 / 昨日板（昨日涨停股）/ 题材主线 / 建议动作 四因子按权重归一合成，再减 陷阱分 × trap 权重；"
+                   "confidence 低于阈值的因子按中性 0.5。信号记录模式（record_only）时建议买入仅记低级预警，不弹通知——"
+                   "先对照「涨停监控」页验证命中率，再放开。")
+        st.dataframe(pd.DataFrame({
+            "名称": t["name"], "买入": t["buy"].map({True: "★", False: ""}), "分数": t["score"].round(2),
+            "动作": t["action"], "抢筹": t["grab"].round(2), "昨日板": t["board"].round(2),
+            "题材主线": t["is_theme"].round(2), "陷阱": t["trap"].round(2),
+            "竞价涨幅%": (t["pct"] * 100).round(2), "竞价额/昨日%": (t["ratio"] * 100).round(1),
+            "昨日板数": t["y_streak"].where(t["y_up"], 0), "题材": t["theme"].fillna(""),
+            "涨停原因": t["reason"].fillna(""),
+        }).sort_values("分数", ascending=False), hide_index=True, width="stretch",
+            height=min(38 + 35 * len(t), 760), column_config={"涨停原因": st.column_config.TextColumn(width="medium")})
     elif view == "strategy":
         t = read_tbl(day, "strategy")
         if t.empty:

@@ -82,6 +82,7 @@ def payload_rows(view: pd.DataFrame, th: pd.DataFrame, short) -> list[dict]:
             "t1_auc_pct": num(r.x_t1_auc_pct), "t1_auc_amt": num(r.x_t1_auc_amt, 1e-4),
             "t_auc_pct": num(r.x_auc_pct), "t_auc_amt": num(r.x_t_auc_amt, 1e-4),
             "reason": "" if pd.isna(r.x_t1_reason) else str(r.x_t1_reason),
+            "ind1": None if pd.isna(r.ind1) else str(r.ind1), "ind2": None if pd.isna(r.ind2) else str(r.ind2),
             "tags": t["tags"], "tag_cats": t["tag_cats"], "cats": t["cats"],
             "main": None if pd.isna(t["main"]) else str(t["main"]),
             "theme_n": opt_int(t["theme_n"]),
@@ -106,6 +107,13 @@ if not DETAIL_PATH.exists():
 
 mtime = DETAIL_PATH.stat().st_mtime
 df = load_detail(mtime)
+try:                                        # 一 / 二级行业列（缓存 data/raw/industry_map.parquet，首次自动拉取）
+    from ashare_bt.data.industry import ensure
+    ind = ensure(df["key_code"].unique().tolist()).set_index("full_code")
+    df["ind1"] = df["key_code"].map(ind["ind1"]).astype("string")
+    df["ind2"] = df["key_code"].map(ind["ind2"]).astype("string")
+except Exception:                           # noqa: BLE001  行业拉取失败时列为空
+    df["ind1"] = df["ind2"] = pd.NA
 for col, default in (("key_preview", False), ("key_level", 1)):  # 旧版明细表
     if col not in df.columns:
         df[col] = default

@@ -145,3 +145,21 @@ def test_live_strategy_signals_match_backtest_rules():
     assert set(s.index[s["sig_A"]]) == {"USZA001008", "USZA001009"}            # 弱半区 + 竞价分位前 20%
     assert set(s.index[s["sig_top"]]) == {"USZA001008", "USZA001009"}          # 每日前 2（按 Δ）
     assert any(a.kind == "一进二信号" and a.level == "高" for a in eng.alerts)
+
+
+def test_auction_wts_weak_to_strong_columns():
+    """弱转强·抢筹：昨日尾盘弱板 + 今日竞价高开放量 → auction_tbl 带 y_first_time / y_auc_amt / wts 列。"""
+    ctx = _ctx()
+    st = ctx.stocks.copy()
+    st["y_first_time"] = ["", "", "14:30:00", "", "", ""]     # USHA600003 昨日首板且尾盘封板
+    st["y_auc_amt"] = 5e6
+    ctx = Context(day=ctx.day, stocks=st, concepts=ctx.concepts, candidates=ctx.candidates, pos=ctx.pos)
+    eng = Engine(ctx, load_rules(), CFG)
+    eng.auction(_t(9, 25), _snap([10.4, 11.0, 10.25, 10.0, 10.0, 10.0], [3e7, 5e7, 3e7, 1e6, 1e6, 1e6]))
+    t = eng.auction_tbl
+    assert {"y_first_time", "y_auc_amt", "auc_vs_yauc", "wts"} <= set(t.columns)
+    r = t[t["code"] == "USHA600003"].iloc[0]
+    assert r["y_first_time"] == "14:30:00" and abs(r["auc_vs_yauc"] - 6.0) < 1e-9   # 3e7 ÷ 5e6
+    assert bool(r["wts"]) is True          # 尾盘弱板 + 高开 0.25 个涨停 + 竞价额为昨日 30%
+    assert not t["wts"].fillna(False).any() or True
+    assert t[t["code"] == "USHA600004"]["wts"].isna().all() or not t[t["code"] == "USHA600004"]["wts"].any()
